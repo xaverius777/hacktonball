@@ -1,0 +1,14 @@
+From the hacktonball directory, run:
+
+pyinstaller --clean --noconfirm --onefile --name Hacktonball --icon hacktonball.ico --add-data "audio;audio" --add-data "code;code" embedded_hacktonball.py
+
+For this to work:
+- Google Chrome must be installed
+- Your screen must be at least 1200 * 800
+
+This game relies on Nand 2 Tetris' VM emulator (https://nand2tetris.github.io/web-ide/vm), so:
+- if the VM emulator changes, the game might break.
+- if the VM emulator disappears, there wouldn't be a place to run the game.
+
+Also: the executable may take a few seconds to start on first launch because PyInstaller extracts bundled files into a temporary runtime directory.
+
