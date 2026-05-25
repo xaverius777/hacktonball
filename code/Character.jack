@@ -1,0 +1,573 @@
+class Character {
+    
+    static Array characterSprite; 
+    static Array airborneCharacterSprite;
+    static Array characterSpriteReverse;
+    static Array airborneCharacterSpriteReverse;
+    
+    static int characterSpriteHeight; 
+    field int pixelXPos, pixelYPos; 
+    field int previousPixelXPos, previousPixelYPos; 
+    field int vX, vY; 
+    field boolean airborne;
+    field boolean previousAirborne;
+    field boolean facingRight;
+    field boolean previousFacingRight;
+
+    constructor Character new( 
+        int inputPixelXPos, 
+        int inputPixelYPos
+    ) { 
+        let pixelXPos = inputPixelXPos; 
+        let pixelYPos = inputPixelYPos; 
+        let previousPixelXPos = inputPixelXPos; 
+        let previousPixelYPos = inputPixelYPos; 
+        let vX = 0; 
+        let vY = 0; 
+        let airborne = true;
+        let previousAirborne = airborne; 
+        let facingRight = true;
+        let previousFacingRight = facingRight;
+        return this; 
+    }
+     
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+        
+    method int getLeftX() { return pixelXPos; }
+
+    method int getRightX() { return pixelXPos + 16; }
+
+    method int getTopY() { return pixelYPos; }
+
+    method int getBottomY() { return pixelYPos + 32; }   
+
+    method void handleInput() { 
+        var int key; 
+        
+        let key = Keyboard.keyPressed(); 
+        
+        // LEFT 
+        if (key = 130) { 
+            let facingRight = false;
+            if (vX > -4) {
+                let vX = vX - 1; 
+            } 
+        } 
+        // RIGHT 
+        if (key = 132) { 
+            let facingRight = true;
+            if (vX < 4) { 
+                let vX = vX + 1; 
+            } 
+        } 
+        // NO KEY → apply friction (this allows stopping midair) 
+        if (key = 0) { 
+            if (vX > 0) { 
+                let vX = vX - 1; 
+            } if (vX < 0) { 
+                let vX = vX + 1; 
+            } 
+        } 
+        // JUMP 
+        if (key = 32) { 
+            do jump(); 
+        } 
+        
+        return; 
+    } 
+    
+    method boolean update(
+        Array platforms, 
+        int platformCount,
+        Array walls,
+        int wallCount
+    ) { 
+        var int oldY, oldX; 
+        var boolean moved;
+
+        let previousPixelXPos = pixelXPos; 
+        let previousPixelYPos = pixelYPos;
+        let previousAirborne = airborne; 
+        let previousFacingRight = facingRight;
+        let oldY = pixelYPos;
+        let oldX = pixelXPos; 
+        
+        // Input 
+        do handleInput(); 
+        
+        // Horizontal movement 
+        let pixelXPos = pixelXPos + vX; 
+
+        do resolveWallCollision(walls, wallCount, oldX);
+        
+        // 1. Vertical movement 
+        if (airborne) { 
+            if (vY < 5) { 
+                let vY = vY + 1; 
+            }     
+        let pixelYPos = pixelYPos + vY; 
+        }
+
+        // 2. Collision 
+        do resolveHeadCollision(platforms, platformCount, oldY); 
+        do resolveLanding(platforms, platformCount, oldY); 
+        
+        let moved = ~((pixelXPos = previousPixelXPos) & (pixelYPos = previousPixelYPos)); 
+        return moved; 
+    } 
+        
+    method void jump() { 
+        if (~airborne) { 
+            let vY = -14; 
+            let airborne = true; 
+        } 
+        return; 
+    } 
+        
+    method void resolveHeadCollision(
+        Array platforms, 
+        int n, 
+        int oldY
+    ) { 
+        var int i; 
+        var Platform p; 
+        var int platformLeft, platformRight, platformTop, platformBottom;
+        var int charLeft, charRight; 
+        
+        // Only care if moving UP 
+        if (~(vY < 0)) { return; } 
+        
+        let i = 0; 
+        let charLeft = pixelXPos; 
+        let charRight = pixelXPos + 16; 
+        
+        while (i < n) { 
+            let p = platforms[i]; 
+            
+            let platformLeft = p.getLeftX();
+            let platformRight = p.getRightX();
+            let platformTop = p.getPixelY(); 
+            let platformBottom = platformTop + 8; 
+            
+            // Only solid platforms block from below 
+            if (~p.isCrossable()) { 
+                if (
+                        ((oldY > platformBottom) | (oldY = platformBottom)) 
+                        & ((pixelYPos < platformBottom) | (pixelYPos = platformBottom)) 
+                        & (charRight > platformLeft) & (charLeft < platformRight)    
+                ) { 
+                    let pixelYPos = platformBottom;
+                    let vY = 0; return; 
+                } 
+            } 
+            let i = i + 1; 
+            } 
+        return; 
+    } 
+        
+    method void resolveLanding(
+        Array platforms, 
+        int n, 
+        int oldY
+    ) { 
+        var int i; 
+        var Platform p; 
+        var int platformLeft, platformRight, platformTop; 
+        var int charLeft, charRight, charBottom; 
+        
+        let i = 0; 
+        while (i < n) { 
+            let p = platforms[i];
+
+            let platformLeft = p.getLeftX();
+            let platformRight = p.getRightX();
+            let platformTop = p.getPixelY(); 
+            let charLeft = pixelXPos; 
+            let charRight = pixelXPos + 16; 
+            let charBottom = pixelYPos + 32; 
+            
+            if (
+                (((oldY + 32) < platformTop) | ((oldY + 32) = platformTop)) 
+                & ((charBottom > platformTop) | (charBottom = platformTop)) 
+                & (charRight > platformLeft) & (charLeft < platformRight)
+                ) { 
+                    let pixelYPos = platformTop - 32; 
+                    let vY = 0; 
+                    let airborne = false; 
+                    return; 
+            } 
+            let i = i + 1; 
+            } 
+        let airborne = true; 
+        return; 
+        } 
+
+    method void resolveWallCollision(Array walls, int n, int oldX) {
+        var int i;
+        var Wall w;
+
+        var int wallLeft, wallRight, wallTop, wallBottom;
+        var int charLeft, charRight, charTop, charBottom;
+        var int oldLeft, oldRight;
+
+        let i = 0;
+
+        let charTop = pixelYPos;
+        let charBottom = pixelYPos + 32;
+
+        let oldLeft = oldX;
+        let oldRight = oldX + 16;
+
+        let charLeft = pixelXPos;
+        let charRight = pixelXPos + 16;
+
+        while (i < n) {
+            let w = walls[i];
+
+            let wallLeft = w.getPixelX();
+            let wallRight = w.getPixelX() + 8;
+            let wallTop = w.getTopY();
+            let wallBottom = w.getBottomY();
+
+            // Vertical overlap between character and wall
+            if (
+                (charBottom > wallTop) &
+                (charTop < wallBottom)
+            ) {
+
+                // Moving right: character's right side crosses wall's left side
+                if (
+                    (((oldRight < wallLeft) | (oldRight = wallLeft)) &
+                    ((charRight > wallLeft) | (charRight = wallLeft)))
+                ) {
+                    let pixelXPos = wallLeft - 16;
+                    let vX = 0;
+                    return;
+                }
+
+                // Moving left: character's left side crosses wall's right side
+                if (
+                    (((oldLeft > wallRight) | (oldLeft = wallRight)) &
+                    ((charLeft < wallRight) | (charLeft = wallRight)))
+                ) {
+                    let pixelXPos = wallRight;
+                    let vX = 0;
+                    return;
+                }
+            }
+
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+            
+    /* method void draw() { 
+        do Character.drawCharacter(pixelXPos, pixelYPos); 
+        return; 
+    }
+    
+    method void draw() {
+        if (airborne) {
+            do Character.drawCharacter(pixelXPos, pixelYPos, airborneCharacterSprite);
+        } else {
+            do Character.drawCharacter(pixelXPos, pixelYPos, characterSprite);
+        }
+
+        return;
+    } */
+
+    method void draw() {
+        if (airborne) {
+            if (facingRight) {
+                do Character.drawCharacter(pixelXPos, pixelYPos, airborneCharacterSprite);
+            } else {
+                do Character.drawCharacter(pixelXPos, pixelYPos, airborneCharacterSpriteReverse);
+            }
+        } else {
+            if (facingRight) {
+                do Character.drawCharacter(pixelXPos, pixelYPos, characterSprite);
+            } else {
+                do Character.drawCharacter(pixelXPos, pixelYPos, characterSpriteReverse);
+            }
+        }
+
+        return;
+    }
+            
+    function void drawCharacter(int pixelX, int pixelY, Array sprite) { 
+        var int baseWordX, offset; 
+        var int addr, i; 
+        var int rowBits, leftPart, rightPart; 
+        
+        // TODO: this is lots of math. Can it be optimized in any way?
+        let baseWordX = pixelX / 16; 
+        let offset = pixelX - (baseWordX * 16); 
+        let addr = 16384 + (pixelY * 32) + baseWordX; 
+        let i = 0; 
+        
+        while (i < characterSpriteHeight) { 
+            let rowBits = sprite[i];
+            if (offset = 0) { 
+                do Memory.poke(addr, rowBits);
+            } else { 
+                let leftPart = GraphicsUtils.shiftLeft(rowBits, offset); 
+                let rightPart = GraphicsUtils.shiftRight(rowBits, 16 - offset); 
+                do Memory.poke(addr, leftPart); 
+                do Memory.poke(addr + 1, rightPart); 
+            } 
+            let addr = addr + 32; 
+            let i = i + 1; 
+            } 
+        return; 
+    } 
+    
+    /*method void erase() { 
+        do Character.eraseCharacter(pixelXPos, pixelYPos); 
+        return; 
+    } */
+
+    method void erase() {
+        if (airborne) {
+            do Character.eraseCharacter(pixelXPos, pixelYPos, airborneCharacterSprite);
+        } else {
+            do Character.eraseCharacter(pixelXPos, pixelYPos, characterSprite);
+        }
+
+        return;
+    }
+    
+    /* method void erasePrevious() { 
+        do Character.eraseCharacter(previousPixelXPos, previousPixelYPos); 
+        return;
+    } 
+    method void erasePrevious() {
+        if (previousAirborne) {
+            do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, airborneCharacterSprite);
+        } else {
+            do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, characterSprite);
+        }
+
+        return;
+    } */
+
+    method void erasePrevious() {
+        if (previousAirborne) {
+            if (previousFacingRight) {
+                do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, airborneCharacterSprite);
+            } else {
+                do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, airborneCharacterSpriteReverse);
+            }
+        } else {
+            if (previousFacingRight) {
+                do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, characterSprite);
+            } else {
+                do Character.eraseCharacter(previousPixelXPos, previousPixelYPos, characterSpriteReverse);
+            }
+        }
+
+        return;
+    }
+    
+    function void eraseCharacter(int pixelX, int pixelY, Array sprite) { 
+        var int baseWordX, offset; 
+        var int addr, i; 
+        var int rowBits, leftPart, rightPart; 
+        var int current; 
+        
+        let baseWordX = pixelX / 16; 
+        let offset = pixelX - (baseWordX * 16); 
+        let addr = 16384 + (pixelY * 32) + baseWordX; 
+        let i = 0; 
+        
+        while (i < characterSpriteHeight) { 
+            let rowBits = sprite[i]; 
+            if (offset = 0) { 
+                let current = Memory.peek(addr); 
+                do Memory.poke(addr, current & (-1 - rowBits)); 
+            } else { 
+                let leftPart = GraphicsUtils.shiftLeft(rowBits, offset); 
+                let rightPart = GraphicsUtils.shiftRight(rowBits, 16 - offset); 
+                // left word 
+                let current = Memory.peek(addr); 
+                do Memory.poke(addr, current & (-1 - leftPart)); 
+                // right word 
+                let current = Memory.peek(addr + 1); 
+                do Memory.poke(addr + 1, current & (-1 - rightPart)); 
+            } 
+            let addr = addr + 32; 
+            let i = i + 1; 
+        } 
+        return; 
+    } 
+
+    function void initCharacterSprite() {
+        // Ground sprite for Antxon.
+        
+        let characterSpriteHeight = 32;
+        let characterSprite = Array.new(characterSpriteHeight);
+        /*
+        let characterSprite[0] = 0;
+        let characterSprite[1] = 16384;
+        let characterSprite[2] = 16384;
+        let characterSprite[3] = 32736;
+        let characterSprite[4] = 32752;
+        let characterSprite[5] = 16380;
+        let characterSprite[6] = 16380;
+        let characterSprite[7] = 8223;
+        let characterSprite[8] = 8217;
+        let characterSprite[9] = 28185;
+        let characterSprite[10] = 16457;
+        let characterSprite[11] = 24679;
+        let characterSprite[12] = 16359;
+        let characterSprite[13] = 12404;
+        let characterSprite[14] = 16372;
+        let characterSprite[15] = 4068;
+        let characterSprite[16] = 6175;
+        let characterSprite[17] = 14365;
+        let characterSprite[18] = 22553;
+        let characterSprite[19] = 22553;
+        let characterSprite[20] = 22553;
+        let characterSprite[21] = 22555;
+        let characterSprite[22] = 30751;
+        let characterSprite[23] = 24573;
+        let characterSprite[24] = 32767;
+        let characterSprite[25] = 8188;
+        let characterSprite[26] = 16382;
+        let characterSprite[27] = 16382;
+        let characterSprite[28] = 14350;
+        let characterSprite[29] = 14350;
+        let characterSprite[30] = 14350;
+        let characterSprite[31] = 30735; */
+        let characterSprite[0] = 16384;
+        let characterSprite[1] = 24576;
+        let characterSprite[2] = 24576;
+        let characterSprite[3] = 32704;
+        let characterSprite[4] = 16352;
+        let characterSprite[5] = 16376;
+        let characterSprite[6] = 16376;
+        let characterSprite[7] = 8254;
+        let characterSprite[8] = 28210;
+        let characterSprite[9] = 16434;
+        let characterSprite[10] = 24722;
+        let characterSprite[11] = 16334;
+        let characterSprite[12] = 12780;
+        let characterSprite[13] = 16360;
+        let characterSprite[14] = 8136;
+        let characterSprite[15] = 14396;
+        let characterSprite[16] = 22582;
+        let characterSprite[17] = 22578;
+        let characterSprite[18] = 22578;
+        let characterSprite[19] = 22578;
+        let characterSprite[20] = 22578;
+        let characterSprite[21] = 32766;
+        let characterSprite[22] = 24570;
+        let characterSprite[23] = 32766;
+        let characterSprite[24] = 8184;
+        let characterSprite[25] = 16380;
+        let characterSprite[26] = 15420;
+        let characterSprite[27] = 14364;
+        let characterSprite[28] = 14364;
+        let characterSprite[29] = 14364;
+        let characterSprite[30] = 14364;
+        let characterSprite[31] = 30750;
+        return;
+    }
+
+    function void initAirborneCharacterSprite() {
+        // Airborne / jumping sprite for Antxon.
+        
+        let characterSpriteHeight = 32;
+        let airborneCharacterSprite = Array.new(characterSpriteHeight);
+        /*
+        let airborneCharacterSprite[0] = 0;
+        let airborneCharacterSprite[1] = 16384;
+        let airborneCharacterSprite[2] = 16384;
+        let airborneCharacterSprite[3] = 32736;
+        let airborneCharacterSprite[4] = 32752;
+        let airborneCharacterSprite[5] = 16380;
+        let airborneCharacterSprite[6] = 16380;
+        let airborneCharacterSprite[7] = 8223;
+        let airborneCharacterSprite[8] = 8217;
+        let airborneCharacterSprite[9] = 28185;
+        let airborneCharacterSprite[10] = 16457;
+        let airborneCharacterSprite[11] = 24679;
+        let airborneCharacterSprite[12] = 16359;
+        let airborneCharacterSprite[13] = 12404;
+        let airborneCharacterSprite[14] = 32756;
+        let airborneCharacterSprite[15] = 24548;
+        let airborneCharacterSprite[16] = 30748;
+        let airborneCharacterSprite[17] = 22558;
+        let airborneCharacterSprite[18] = 22554;
+        let airborneCharacterSprite[19] = 22554;
+        let airborneCharacterSprite[20] = 22650;
+        let airborneCharacterSprite[21] = 22610;
+        let airborneCharacterSprite[22] = 30846;
+        let airborneCharacterSprite[23] = 8188;
+        let airborneCharacterSprite[24] = 16380;
+        let airborneCharacterSprite[25] = 16380;
+        let airborneCharacterSprite[26] = 16380;
+        let airborneCharacterSprite[27] = 12316;
+        let airborneCharacterSprite[28] = 12300;
+        let airborneCharacterSprite[29] = 28687;
+        let airborneCharacterSprite[30] = 7;
+        let airborneCharacterSprite[31] = 1;
+        */
+        let airborneCharacterSprite[0] = 6144;
+        let airborneCharacterSprite[1] = 12288;
+        let airborneCharacterSprite[2] = 24576;
+        let airborneCharacterSprite[3] = 32704;
+        let airborneCharacterSprite[4] = 16352;
+        let airborneCharacterSprite[5] = 16376;
+        let airborneCharacterSprite[6] = 16376;
+        let airborneCharacterSprite[7] = 8254;
+        let airborneCharacterSprite[8] = 28210;
+        let airborneCharacterSprite[9] = 16434;
+        let airborneCharacterSprite[10] = 24722;
+        let airborneCharacterSprite[11] = 16334;
+        let airborneCharacterSprite[12] = 12780;
+        let airborneCharacterSprite[13] = 16360;
+        let airborneCharacterSprite[14] = 32712;
+        let airborneCharacterSprite[15] = 22590;
+        let airborneCharacterSprite[16] = 30770;
+        let airborneCharacterSprite[17] = 22578;
+        let airborneCharacterSprite[18] = 22578;
+        let airborneCharacterSprite[19] = 22578;
+        let airborneCharacterSprite[20] = 22770;
+        let airborneCharacterSprite[21] = 32674;
+        let airborneCharacterSprite[22] = 8190;
+        let airborneCharacterSprite[23] = 4088;
+        let airborneCharacterSprite[24] = 8184;
+        let airborneCharacterSprite[25] = 16376;
+        let airborneCharacterSprite[26] = 14392;
+        let airborneCharacterSprite[27] = 12312;
+        let airborneCharacterSprite[28] = 12312;
+        let airborneCharacterSprite[29] = 28702;
+        let airborneCharacterSprite[30] = 14;
+        let airborneCharacterSprite[31] = 2;
+        return;
+    }
+
+    function void initReversedSprites() {
+        var int i;
+
+        let characterSpriteReverse = Array.new(characterSpriteHeight);
+        let airborneCharacterSpriteReverse = Array.new(characterSpriteHeight);
+
+        let i = 0;
+        while (i < characterSpriteHeight) {
+            let characterSpriteReverse[i] = GraphicsUtils.reverse16(characterSprite[i]) & 32767;
+            let airborneCharacterSpriteReverse[i] = GraphicsUtils.reverse16(airborneCharacterSprite[i]) & 32767;
+            let i = i + 1;
+        }
+
+        return;
+    }
+}
+
+
+

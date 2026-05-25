@@ -1,0 +1,92 @@
+class Wall {
+
+    static Array blockSprite;
+    static int blockSpriteWidth;
+
+    field int pixelX, pixelY, length;
+    field int topY, bottomY;
+
+    constructor Wall new(
+        int aPixelX,
+        int aPixelY,
+        int aLength
+    ) {
+        let pixelX = aPixelX;
+        let pixelY = aPixelY;
+        let length = aLength;
+        let topY = aPixelY;
+        let bottomY = aPixelY + (aLength * 8);
+        return this;
+    }
+
+    // Attribute getters
+    method int getPixelX() { return pixelX; }
+
+    method int getPixelY() { return pixelY; }
+
+    method int getLength() { return length; }
+
+    method int getTopY() { return topY; }
+
+    method int getBottomY() { return bottomY; }
+
+    // Graphics
+    method void draw() {
+        var int i;
+        let i = 0;
+
+        while (i < length) {
+            do Wall.drawBlock(pixelX, pixelY + (i * 8));
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    function void drawBlock(int pixelX, int pixelY) {
+        var int baseWordX, offset;
+        var int addr, i;
+        var int rowBits, leftPart, rightPart;
+
+        let baseWordX = pixelX / 16;
+        let offset = pixelX - (baseWordX * 16);
+        let addr = 16384 + (pixelY * 32) + baseWordX;
+        let i = 0;
+
+        while (i < 8) {
+            let rowBits = blockSprite[i];
+
+            if (offset = 0) {
+                do Memory.poke(addr, rowBits);
+            } else {
+                let leftPart = GraphicsUtils.shiftLeft(rowBits, offset);
+                let rightPart = GraphicsUtils.shiftRight(rowBits, 16 - offset);
+
+                do Memory.poke(addr, leftPart);
+                do Memory.poke(addr + 1, rightPart);
+            }
+
+            let addr = addr + 32;
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    function void initBlockSprite() {
+        let blockSpriteWidth = 8;
+        let blockSprite = Array.new(8);
+
+        // Left-aligned 8x8 solid block inside a 16-bit word
+        let blockSprite[0] = 255;   // 11111111
+        let blockSprite[1] = 129;   // 10000001
+        let blockSprite[2] = 129;
+        let blockSprite[3] = 129;
+        let blockSprite[4] = 129;
+        let blockSprite[5] = 129;
+        let blockSprite[6] = 129;
+        let blockSprite[7] = 255;
+
+        return;
+    }
+}

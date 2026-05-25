@@ -1,0 +1,420 @@
+class Ball {
+
+    static Array ballSprite;
+    static int ballSpriteHeight;
+
+    field int pixelXPos, pixelYPos;
+    field int previousPixelXPos, previousPixelYPos;
+    field int vX, vY;
+    field int collisionCooldown;
+    
+    field int wallEvent;
+    field int anchor1;
+    field int anchor2;
+    // 0 = none
+    // 1 = hit right wall
+    // 2 = hit left wall
+    // 3 = hit ceiling
+    // 4 = hit floor
+    
+    constructor Ball new(
+        int inputPixelXPos,
+        int inputPixelYPos
+    ) {
+        let pixelXPos = inputPixelXPos;
+        let pixelYPos = inputPixelYPos;
+        let previousPixelXPos = inputPixelXPos;
+        let previousPixelYPos = inputPixelYPos;
+        let vX = 2;
+        let vY = -2;
+        let collisionCooldown = 0;
+        let wallEvent = 0;
+        let anchor1 = 12841;
+        let anchor2 = 24261;
+        return this;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    method boolean update(
+        Array platforms,
+        int platformCount,
+        Array walls,
+        int wallCount,
+        Character player
+    ) {
+        var int oldX, oldY;
+        var boolean moved;
+        
+        let previousPixelXPos = pixelXPos;
+        let previousPixelYPos = pixelYPos;
+
+        let oldX = pixelXPos;
+        let oldY = pixelYPos;
+
+        let wallEvent = 0;
+        
+        if (collisionCooldown > 0) {
+            let collisionCooldown = collisionCooldown - 1;
+        }
+
+        let pixelXPos = pixelXPos + vX;
+        let pixelYPos = pixelYPos + vY;
+
+        do resolveWallBounce(walls, wallCount, oldX);
+        do resolveCeilingBounce(platforms, platformCount, oldY);
+        do resolveFloorBounce(platforms, platformCount, oldY);
+        do resolvePlayerBounce(player, oldX, oldY);
+
+        let moved = ~((pixelXPos = previousPixelXPos) & (pixelYPos = previousPixelYPos));
+        return moved;
+    }
+
+    method int consumeWallEvent() {
+        var int e;
+        let e = wallEvent;
+        let wallEvent = 0;
+        return e;
+    }
+
+    method void resolveWallBounce(Array walls, int n, int oldX) {
+        var int i;
+        var Wall w;
+
+        var int wallLeft, wallRight, wallTop, wallBottom;
+        var int ballLeft, ballRight, ballTop, ballBottom;
+        var int oldLeft, oldRight;
+
+        let i = 0;
+
+        let ballTop = pixelYPos;
+        let ballBottom = pixelYPos + 8;
+
+        let oldLeft = oldX;
+        let oldRight = oldX + 8;
+
+        let ballLeft = pixelXPos;
+        let ballRight = pixelXPos + 8;
+
+        while (i < n) {
+            let w = walls[i];
+
+            let wallLeft = w.getPixelX();
+            let wallRight = w.getPixelX() + 8;
+            let wallTop = w.getTopY();
+            let wallBottom = w.getBottomY();
+
+            if (
+                (ballBottom > wallTop) &
+                (ballTop < wallBottom)
+            ) {
+
+                // Moving right into wall
+                if (
+                    (((oldRight < wallLeft) | (oldRight = wallLeft)) &
+                    ((ballRight > wallLeft) | (ballRight = wallLeft)))
+                ) {
+                    let pixelXPos = wallLeft - 8;
+                    let vX = -3;
+                    let wallEvent = 1;
+                    return;
+                }
+
+                // Moving left into wall
+                if (
+                    (((oldLeft > wallRight) | (oldLeft = wallRight)) &
+                    ((ballLeft < wallRight) | (ballLeft = wallRight)))
+                ) {
+                    let pixelXPos = wallRight;
+                    let vX = 3;
+                    let wallEvent = 2;   // hit left wall -> game over
+                    return;
+                }
+            }
+
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    method void resolveCeilingBounce(
+        Array platforms,
+        int n,
+        int oldY
+    ) {
+        var int i;
+        var Platform p;
+
+        var int platformLeft, platformRight, platformTop, platformBottom;
+        var int ballLeft, ballRight;
+
+        if (~(vY < 0)) { return; }
+
+        let i = 0;
+        let ballLeft = pixelXPos;
+        let ballRight = pixelXPos + 8;
+
+        while (i < n) {
+            let p = platforms[i];
+
+            let platformLeft = p.getLeftX();
+            let platformRight = p.getRightX();
+            let platformTop = p.getPixelY();
+            let platformBottom = platformTop + 8;
+
+            if (~p.isCrossable()) {
+                if (
+                    ((oldY > platformBottom) | (oldY = platformBottom)) &
+                    ((pixelYPos < platformBottom) | (pixelYPos = platformBottom)) &
+                    (ballRight > platformLeft) &
+                    (ballLeft < platformRight)
+                ) {
+                    let pixelYPos = platformBottom;
+                    let vY = 3;
+                    let wallEvent = 3;
+                    return;
+                }
+            }
+
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    method void resolveFloorBounce(
+        Array platforms,
+        int n,
+        int oldY
+    ) {
+        var int i;
+        var Platform p;
+
+        var int platformLeft, platformRight, platformTop;
+        var int ballLeft, ballRight, ballBottom;
+
+        if (~(vY > 0)) { return; }
+
+        let i = 0;
+
+        while (i < n) {
+            let p = platforms[i];
+
+            let platformLeft = p.getLeftX();
+            let platformRight = p.getRightX();
+            let platformTop = p.getPixelY();
+
+            let ballLeft = pixelXPos;
+            let ballRight = pixelXPos + 8;
+            let ballBottom = pixelYPos + 8;
+
+            if (
+                ((oldY + 8 < platformTop) | ((oldY + 8) = platformTop)) &
+                ((ballBottom > platformTop) | (ballBottom = platformTop)) &
+                (ballRight > platformLeft) &
+                (ballLeft < platformRight)
+            ) {
+                let pixelYPos = platformTop - 8;
+                let vY = -3;
+                let wallEvent = 4;
+                return;
+            }
+
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    method void resolvePlayerBounce(Character player, int oldX, int oldY) {
+        var int playerLeft, playerRight, playerTop, playerBottom;
+        var int ballLeft, ballRight, ballTop, ballBottom;
+        var int oldLeft, oldRight, oldTop, oldBottom;
+        var int ballCenterX;
+
+        if (collisionCooldown > 0) { return; }
+
+        let playerLeft = player.getLeftX();
+        let playerRight = player.getRightX();
+        let playerTop = player.getTopY();
+        let playerBottom = player.getBottomY();
+
+        let ballLeft = pixelXPos;
+        let ballRight = pixelXPos + 8;
+        let ballTop = pixelYPos;
+        let ballBottom = pixelYPos + 8;
+
+        let oldLeft = oldX;
+        let oldRight = oldX + 8;
+        let oldTop = oldY;
+        let oldBottom = oldY + 8;
+
+        // Top hit: ball comes down onto player
+        if (
+            ((oldBottom < playerTop) | (oldBottom = playerTop)) &
+            ((ballBottom > playerTop) | (ballBottom = playerTop)) &
+            (ballRight > playerLeft) &
+            (ballLeft < playerRight)
+        ) {
+            let pixelYPos = playerTop - 8;
+            let vY = -3;
+
+            let ballCenterX = pixelXPos + 4;
+
+            // 3 zones across 16-pixel player width
+            if (ballCenterX < (playerLeft + 5)) {
+                let vX = -3;
+            } else {
+                if (ballCenterX < (playerLeft + 11)) {
+                    // center zone: preserve current horizontal direction
+                    if (vX < 0) {
+                        let vX = -3;
+                    } else {
+                        let vX = 3;
+                    }
+                } else {
+                    let vX = 3;
+                }
+            }
+
+            let collisionCooldown = 2;
+            return;
+        }
+
+        // Bottom hit: ball comes up into player
+        if (
+            ((oldTop > playerBottom) | (oldTop = playerBottom)) &
+            ((ballTop < playerBottom) | (ballTop = playerBottom)) &
+            (ballRight > playerLeft) &
+            (ballLeft < playerRight)
+        ) {
+            let pixelYPos = playerBottom;
+            let vY = 3;
+            let collisionCooldown = 2;
+            return;
+        }
+
+        // Left side of player: ball moving right into player
+        if (
+            ((oldRight < playerLeft) | (oldRight = playerLeft)) &
+            ((ballRight > playerLeft) | (ballRight = playerLeft)) &
+            (ballBottom > playerTop) &
+            (ballTop < playerBottom)
+        ) {
+            let pixelXPos = playerLeft - 8;
+            let vX = -3;
+            let collisionCooldown = 2;
+            return;
+        }
+
+        // Right side of player: ball moving left into player
+        if (
+            ((oldLeft > playerRight) | (oldLeft = playerRight)) &
+            ((ballLeft < playerRight) | (ballLeft = playerRight)) &
+            (ballBottom > playerTop) &
+            (ballTop < playerBottom)
+        ) {
+            let pixelXPos = playerRight;
+            let vX = 3;
+            let collisionCooldown = 2;
+            return;
+        }
+
+        return;
+    }
+
+    method void draw() {
+        do Ball.drawBall(pixelXPos, pixelYPos);
+        return;
+    }
+
+    function void drawBall(int pixelX, int pixelY) {
+        var int baseWordX, offset;
+        var int addr, i;
+        var int rowBits, leftPart, rightPart;
+
+        let baseWordX = pixelX / 16;
+        let offset = pixelX - (baseWordX * 16);
+        let addr = 16384 + (pixelY * 32) + baseWordX;
+        let i = 0;
+
+        while (i < ballSpriteHeight) {
+            let rowBits = ballSprite[i];
+
+            if (offset = 0) {
+                do Memory.poke(addr, rowBits);
+            } else {
+                let leftPart = GraphicsUtils.shiftLeft(rowBits, offset);
+                let rightPart = GraphicsUtils.shiftRight(rowBits, 16 - offset);
+
+                do Memory.poke(addr, leftPart);
+                do Memory.poke(addr + 1, rightPart);
+            }
+
+            let addr = addr + 32;
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    method void erasePrevious() {
+        do Ball.eraseBall(previousPixelXPos, previousPixelYPos);
+        return;
+    }
+
+    function void eraseBall(int pixelX, int pixelY) {
+        var int baseWordX, offset;
+        var int addr, i;
+        var int rowBits, leftPart, rightPart;
+        var int current;
+
+        let baseWordX = pixelX / 16;
+        let offset = pixelX - (baseWordX * 16);
+        let addr = 16384 + (pixelY * 32) + baseWordX;
+        let i = 0;
+
+        while (i < ballSpriteHeight) {
+            let rowBits = ballSprite[i];
+
+            if (offset = 0) {
+                let current = Memory.peek(addr);
+                do Memory.poke(addr, current & (-1 - rowBits));
+            } else {
+                let leftPart = GraphicsUtils.shiftLeft(rowBits, offset);
+                let rightPart = GraphicsUtils.shiftRight(rowBits, 16 - offset);
+
+                let current = Memory.peek(addr);
+                do Memory.poke(addr, current & (-1 - leftPart));
+
+                let current = Memory.peek(addr + 1);
+                do Memory.poke(addr + 1, current & (-1 - rightPart));
+            }
+
+            let addr = addr + 32;
+            let i = i + 1;
+        }
+
+        return;
+    }
+
+    function void initBallSprite() {
+        let ballSpriteHeight = 8;
+        let ballSprite = Array.new(ballSpriteHeight);
+
+        let ballSprite[0] = 60;    // 00111100
+        let ballSprite[1] = 126;   // 01111110
+        let ballSprite[2] = 243;   // 11110011
+        let ballSprite[3] = 243;   // 11110011  <- highlight begins
+        let ballSprite[4] = 255;   // 11111111
+        let ballSprite[5] = 255;   // 11111111
+        let ballSprite[6] = 126;   // 01111110
+        let ballSprite[7] = 60;    // 00111100
+
+        return;
+    }
+}

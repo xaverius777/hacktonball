@@ -1,0 +1,79 @@
+class Platform {
+
+    static Array blockSprite;
+    static int blockSpriteHeight; 
+    field int wordX, pixelY, length; 
+    field int leftX, rightX;
+    field boolean crossable; 
+    
+
+    // TODO: add leftX and leftY so we don't have to compute it for collision check every frame at runtime
+    constructor Platform new(
+        int aWordX, 
+        int aPixelY, 
+        int aLength, 
+        boolean isCrossable
+    ) {
+        let wordX = aWordX;
+        let pixelY = aPixelY; 
+        let length = aLength; 
+        let leftX = aWordX * 16;
+        let rightX = (aWordX + aLength) * 16;
+        let crossable = isCrossable; 
+        return this; 
+    } 
+    
+    // Attribute getters
+    method int getWordX() { return wordX; } 
+    
+    method int getLength() { return length; }
+    
+    method int getPixelY() { return pixelY; }
+
+    method int getLeftX() { return leftX; }
+
+    method int getRightX() { return rightX; }
+    
+    method boolean isCrossable(){ return crossable; }
+    
+    // Graphics
+
+    method void draw() {
+        var int i;
+        let i = 0; 
+        while (i < length) {
+            do Platform.drawBlock(wordX + i, pixelY);
+            let i = i + 1; 
+            } 
+        return; 
+    } 
+    
+    function void drawBlock(int wordX, int pixelY) {
+        var int addr, i; 
+        
+        let addr = 16384 + (pixelY * 32) + wordX; 
+        let i = 0; 
+        while (i < blockSpriteHeight) { 
+            do Memory.poke(addr, blockSprite[i]); 
+            let addr = addr + 32; let i = i + 1; 
+            } 
+        return; 
+    }
+    
+    function void initBlockSprite() {  
+        // ChatGPT block design. 
+        let blockSpriteHeight = 8; 
+        let blockSprite = Array.new(blockSpriteHeight); 
+        let blockSprite[0] = -1;        // 1111111111111111
+        let blockSprite[1] = -32383;    // 1000000000000001
+        let blockSprite[2] = -32383;
+        let blockSprite[3] = -32383;
+        let blockSprite[4] = -32383;
+        let blockSprite[5] = -32383;
+        let blockSprite[6] = -32383;
+        let blockSprite[7] = -1;        // 1111111111111111
+        return; 
+    } 
+}
+
+
