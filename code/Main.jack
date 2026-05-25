@@ -1,0 +1,210 @@
+class Main {
+    // TODO: add max score, it gets the player hooked
+    /* function void drawScore(int score) {
+        do Output.moveCursor(2, 2);
+        do Output.printString("SCORE: ");
+        do Output.printInt(score);
+        do Output.printString("   ");
+        return;
+    } */
+
+    function void drawScore(int score, int maxScore) {
+    do Output.moveCursor(2, 2);
+    do Output.printString("SCORE: ");
+    do Output.printInt(score);
+    do Output.printString("   MAX: ");
+    do Output.printInt(maxScore);
+    do Output.printString("   ");
+    return;
+    }
+
+    function void drawGameWelcome() {
+        do Output.moveCursor(10, 22);
+        do Output.printString("HACKTONBALL CLASSIC");
+        do Output.moveCursor(12, 23);
+        do Output.printString("Press S to start!");
+        return;
+    }
+
+    function void drawGameOver() {
+        do Output.moveCursor(10, 26);
+        do Output.printString("GAME OVER");
+        do Output.moveCursor(12, 20);
+        do Output.printString("Press S to play again!");
+        return;
+    }
+
+    function void drawNewRecord() {
+        do Output.moveCursor(10, 26);
+        do Output.printString("NEW RECORD!");
+        do Output.moveCursor(12, 20);
+        do Output.printString("Press S to play again!");
+        return;
+    }
+
+    function void waitForAnyKey() {
+        while (Keyboard.keyPressed() = 0) {
+        }
+
+        while (~(Keyboard.keyPressed() = 0)) {
+        }
+
+        return;
+    }
+
+    function void waitForSpecificKey(int keyCode) {
+
+        while (~(Keyboard.keyPressed() = keyCode)) {
+        }
+
+        while (Keyboard.keyPressed() = keyCode) {
+        }
+
+        return;
+    }
+
+    function void main() {
+
+        var Platform floor, roof;
+        var Array platforms;
+
+        var Wall leftWall, rightWall;
+        var Array walls;
+
+        var Character c1;
+        var boolean characterMoved;
+
+        var Ball ball1;
+        var boolean ballMoved;
+
+        var boolean gameOver, newRecord;
+        var int score, maxScore, wallEvent, nonZeroWallEvent;
+
+        let platforms = Array.new(2);
+        let walls = Array.new(2);
+
+        do Platform.initBlockSprite();
+        do Wall.initBlockSprite();
+        do Character.initCharacterSprite();
+        do Character.initAirborneCharacterSprite();
+        do Character.initReversedSprites();
+        do Ball.initBallSprite();
+
+        // Walls
+        let leftWall = Wall.new(8, 8, 30);
+        let rightWall = Wall.new(496, 8, 30);
+
+        let walls[0] = leftWall;
+        let walls[1] = rightWall;
+
+        // Frame platforms
+        let roof = Platform.new(1, 8, 30, false);
+        let floor = Platform.new(1, 240, 30, false);
+
+        let platforms[0] = roof;
+        let platforms[1] = floor;
+
+        // Welcome screen
+        do Screen.clearScreen();
+        do leftWall.draw();
+        do rightWall.draw();
+        do floor.draw();
+        do roof.draw();
+        do Main.drawGameWelcome();
+        do Main.waitForSpecificKey(83); // S
+        
+        // Initialize max score
+        let maxScore = 0;
+        while (true) {
+            do Screen.clearScreen();
+
+            // Reset game state
+            let c1 = Character.new(160, 180);
+            let ball1 = Ball.new(200, 120);
+            let newRecord = false;
+
+
+            // Sneaky pointer exposure for Python runtime
+            do Output.moveCursor(10, 10);
+            do Output.printString("Number of birds in the sky right now: ");
+            do Output.printInt(ball1);
+            do Output.printString("   ");
+
+            // Give Python time to scrape the pointer
+            do Sys.wait(500);
+
+            // Clear silly message before gameplay begins
+            do Output.moveCursor(10, 10);
+            do Output.printString("                                            ");
+
+            let score = 0;
+            let gameOver = false;
+
+            // Initial draw
+            do leftWall.draw();
+            do rightWall.draw();
+            do floor.draw();
+            do roof.draw();
+            do Main.drawScore(score, maxScore);
+            do c1.draw();
+            do ball1.draw();
+
+            while (~gameOver) {
+                let characterMoved = c1.update(platforms, 2, walls, 2);
+                let ballMoved = ball1.update(platforms, 2, walls, 2, c1);
+
+                let wallEvent = ball1.consumeWallEvent();
+                if (~(wallEvent = 0)) { 
+                    let nonZeroWallEvent = wallEvent;
+                } 
+                /*if (~(wallEvent = 0)) {
+                    do Output.moveCursor(1, 1);
+                    do Output.printString("EVENT: ");
+                    do Output.printInt(wallEvent);
+                    do Output.printString("   ");
+                }*/
+
+
+                if (wallEvent = 1) {
+                    let score = score + 1;
+
+                    if (score > maxScore) {
+                        let maxScore = score;
+                        let newRecord = true;
+                    }
+
+                    do Main.drawScore(score, maxScore);
+                }
+
+                if (wallEvent = 2) {
+                    let gameOver = true;
+                }
+
+                if (characterMoved) {
+                    do c1.erasePrevious();
+                    do c1.draw();
+                }
+                
+                if (ballMoved) {
+                    do ball1.erasePrevious();
+                    do ball1.draw();
+                }
+
+                do Sys.wait(1);
+            }
+
+            // Game ended: free per-run heap objects here
+            do c1.dispose();
+            do ball1.dispose();
+            if (newRecord) {
+                do Main.drawNewRecord();
+            }
+            else {
+                do Main.drawGameOver();
+            }
+            do Main.waitForSpecificKey(83); // S
+        }
+
+        return;
+    }
+}
